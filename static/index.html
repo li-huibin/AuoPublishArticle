@@ -1,0 +1,2036 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>小苏的热事笔记 - 创作台</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked@11.1.1/marked.min.js"></script>
+    <style>
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        @keyframes slideDown {
+            from { opacity: 0; transform: translateY(-20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        @keyframes shimmer {
+            0% { background-position: -1000px 0; }
+            100% { background-position: 1000px 0; }
+        }
+        @keyframes shimmerGlow {
+            0%, 100% { opacity: 0.6; }
+            50% { opacity: 1; }
+        }
+        .spinning { animation: spin 1s linear infinite; }
+        .slide-down { animation: slideDown 0.5s ease-out; }
+        .fade-in { animation: fadeIn 0.3s ease-out; }
+        .pulsing { animation: pulse 1.5s ease-in-out infinite; }
+        .skeleton {
+            background: linear-gradient(90deg, #f0f0f0 0%, #f0f0f0 40%, #e8e8e8 50%, #f0f0f0 60%, #f0f0f0 100%);
+            background-size: 200% 100%;
+            animation: shimmer 2s ease-in-out infinite, shimmerGlow 3s ease-in-out infinite;
+            border-radius: 12px;
+            position: relative;
+            overflow: hidden;
+        }
+        .skeleton::after {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.6) 50%, transparent 100%);
+            animation: shimmer 1.5s ease-in-out infinite;
+        }
+        .hot-card {
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            transform-style: preserve-3d;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.07), 0 2px 4px rgba(0,0,0,0.06);
+        }
+        .hot-card:hover { transform: translateY(-6px) scale(1.02); box-shadow: 0 8px 24px rgba(0,0,0,0.15); }
+        .hot-card:active { transform: translateY(-2px) scale(0.98); }
+        .hot-card.selected {
+            background: linear-gradient(135deg, #EFF6FF 0%, #DBEAFE 100%);
+            border: 3px solid #3B82F6;
+            box-shadow: 0 0 0 4px rgba(59,130,246,0.2), 0 8px 16px rgba(59,130,246,0.3);
+            transform: translateY(-2px);
+        }
+        .hot-card.selected::before {
+            content: '✓';
+            position: absolute;
+            top: 8px; right: 8px;
+            width: 24px; height: 24px;
+            background: #3B82F6;
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            font-weight: bold;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+        .hot-card.heat-high { border-color: #EF4444; }
+        .hot-card.heat-high .heat-badge { background: linear-gradient(135deg, #FEE2E2 0%, #FECACA 100%); color: #DC2626; }
+        .hot-card.heat-medium { border-color: #F59E0B; }
+        .hot-card.heat-medium .heat-badge { background: linear-gradient(135deg, #FEF3C7 0%, #FDE68A 100%); color: #D97706; }
+        .hot-card.heat-low { border-color: #10B981; }
+        .hot-card.heat-low .heat-badge { background: linear-gradient(135deg, #D1FAE5 0%, #A7F3D0 100%); color: #059669; }
+        .heat-badge { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 600; }
+        .heat-value-display {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 14px;
+            font-weight: 700;
+            color: #EF4444;
+            background: linear-gradient(135deg, #FEE2E2 0%, #FEF2F2 100%);
+            padding: 4px 10px;
+            border-radius: 14px;
+            box-shadow: 0 2px 4px rgba(239,68,68,0.15);
+            transition: all 0.3s ease;
+        }
+        .heat-value-display:hover { transform: scale(1.05); box-shadow: 0 3px 8px rgba(239,68,68,0.25); }
+        .topic-tooltip {
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%) translateY(-8px);
+            background: rgba(17,24,39,0.95);
+            color: white;
+            padding: 12px 16px;
+            border-radius: 8px;
+            font-size: 13px;
+            line-height: 1.5;
+            max-width: 280px;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s ease, transform 0.2s ease;
+            z-index: 100;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        }
+        .topic-tooltip::after {
+            content: '';
+            position: absolute;
+            top: 100%; left: 50%;
+            transform: translateX(-50%);
+            border: 6px solid transparent;
+            border-top-color: rgba(17,24,39,0.95);
+        }
+        .hot-card:hover .topic-tooltip { opacity: 1; transform: translateX(-50%) translateY(-12px); }
+        .btn-primary { transition: all 0.2s ease; min-height: 44px; }
+        .btn-primary:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(59,130,246,0.4); }
+        .btn-primary:active:not(:disabled) { transform: translateY(0); }
+        .image-card { transition: all 0.2s ease; }
+        .image-card:hover .image-overlay { opacity: 1; }
+        .progress-bar { transition: width 0.3s ease; }
+        .wechat-preview { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif; }
+        .touch-target { min-width: 44px; min-height: 44px; }
+        .drag-over { border: 2px dashed #3B82F6; background-color: rgba(59,130,246,0.05); }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; }
+        ::-webkit-scrollbar-thumb { background: #c1c1c1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #888; }
+        .empty-state { text-align: center; padding: 3rem 1rem; }
+        .empty-state-icon { font-size: 4rem; margin-bottom: 1rem; opacity: 0.5; }
+        .char-count { font-size: 0.75rem; color: #6b7280; transition: color 0.2s; }
+        .char-count.warning { color: #f59e0b; }
+        .char-count.error { color: #ef4444; }
+
+        /* ========== 双栏编辑器样式 ========== */
+        .editor-wrapper {
+            border: 1px solid #e5e7eb;
+            border-radius: 0.5rem;
+            overflow: hidden;
+            background: white;
+        }
+        .editor-toolbar {
+            display: flex;
+            gap: 0.375rem;
+            padding: 0.625rem 0.75rem;
+            background: #f9fafb;
+            border-bottom: 1px solid #e5e7eb;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        .toolbar-btn {
+            padding: 0.375rem 0.625rem;
+            border: 1px solid #d1d5db;
+            background: white;
+            border-radius: 0.375rem;
+            cursor: pointer;
+            transition: all 0.15s;
+            font-size: 0.8125rem;
+            font-weight: 500;
+            color: #374151;
+            white-space: nowrap;
+            line-height: 1;
+        }
+        .toolbar-btn:hover { background: #f3f4f6; border-color: #9ca3af; color: #111827; }
+        .toolbar-btn:active { background: #e5e7eb; transform: scale(0.97); }
+        .toolbar-divider { width: 1px; height: 24px; background: #e5e7eb; margin: 0 0.125rem; }
+        .toolbar-spacer { flex: 1; }
+
+        /* 智能排版下拉菜单 */
+        .smart-dropdown { position: relative; display: inline-block; }
+        .smart-dropdown-btn {
+            padding: 0.375rem 0.625rem;
+            border: 1px solid #d1d5db;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 0.375rem;
+            cursor: pointer;
+            transition: all 0.15s;
+            font-size: 0.8125rem;
+            font-weight: 600;
+            white-space: nowrap;
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+        }
+        .smart-dropdown-btn:hover { opacity: 0.9; transform: translateY(-1px); }
+        .smart-dropdown-menu {
+            display: none;
+            position: absolute;
+            top: calc(100% + 4px);
+            right: 0;
+            background: white;
+            min-width: 200px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.12), 0 2px 6px rgba(0,0,0,0.08);
+            border-radius: 0.5rem;
+            z-index: 200;
+            border: 1px solid #e5e7eb;
+            overflow: hidden;
+        }
+        .smart-dropdown-menu.open { display: block; animation: slideDown 0.15s ease-out; }
+        .dropdown-section-title {
+            padding: 0.5rem 0.75rem 0.25rem;
+            font-size: 0.6875rem;
+            font-weight: 700;
+            color: #9ca3af;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        .dropdown-item {
+            padding: 0.625rem 0.875rem;
+            cursor: pointer;
+            transition: background 0.15s;
+            font-size: 0.8125rem;
+            color: #374151;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .dropdown-item:hover { background: #f9fafb; }
+        .dropdown-item-icon { font-size: 1rem; width: 1.25rem; text-align: center; }
+        .dropdown-separator { height: 1px; background: #f3f4f6; margin: 0.25rem 0; }
+
+        /* 双栏布局 */
+        .dual-pane-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            min-height: 480px;
+        }
+        .editor-pane {
+            display: flex;
+            flex-direction: column;
+            border-right: 1px solid #e5e7eb;
+        }
+        .preview-pane {
+            display: flex;
+            flex-direction: column;
+        }
+        .pane-header {
+            padding: 0.5rem 0.875rem;
+            background: #f9fafb;
+            border-bottom: 1px solid #e5e7eb;
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: #6b7280;
+            display: flex;
+            align-items: center;
+            gap: 0.375rem;
+        }
+        .pane-header-dot {
+            width: 6px; height: 6px;
+            border-radius: 50%;
+        }
+        #articleContent {
+            flex: 1;
+            padding: 1rem;
+            border: none;
+            resize: none;
+            font-family: 'Courier New', 'Consolas', monospace;
+            font-size: 0.875rem;
+            line-height: 1.7;
+            color: #1f2937;
+            background: white;
+            outline: none;
+            min-height: 460px;
+        }
+        #articleContent:focus { background: #fefefe; }
+        .preview-scroll {
+            flex: 1;
+            padding: 1rem 1.25rem;
+            overflow-y: auto;
+            min-height: 460px;
+        }
+
+        /* 微信预览渲染样式 */
+        .wechat-render { font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif; font-size: 15px; color: #333; line-height: 1.8; }
+        .wechat-render h1 { font-size: 1.3rem; font-weight: 700; margin: 1.25rem 0 0.75rem; color: #111; line-height: 1.4; border-bottom: 2px solid #e5e7eb; padding-bottom: 0.5rem; }
+        .wechat-render h2 { font-size: 1.1rem; font-weight: 600; margin: 1rem 0 0.625rem; color: #222; line-height: 1.4; }
+        .wechat-render h3 { font-size: 1rem; font-weight: 600; margin: 0.875rem 0 0.5rem; color: #333; }
+        .wechat-render p { margin: 0.625rem 0; line-height: 1.8; }
+        .wechat-render ul { margin: 0.625rem 0; padding-left: 1.5rem; list-style: disc; }
+        .wechat-render ol { margin: 0.625rem 0; padding-left: 1.5rem; list-style: decimal; }
+        .wechat-render li { margin: 0.375rem 0; line-height: 1.7; }
+        .wechat-render blockquote { border-left: 3px solid #e5e7eb; padding: 0.5rem 0.875rem; margin: 0.875rem 0; color: #6b7280; background: #f9fafb; border-radius: 0 4px 4px 0; }
+        .wechat-render strong { font-weight: 700; color: #111; }
+        .wechat-render em { font-style: italic; color: #555; }
+        .wechat-render code { background: #f3f4f6; padding: 0.125rem 0.375rem; border-radius: 3px; font-family: monospace; font-size: 0.875em; color: #e53e3e; }
+        .wechat-render pre { background: #1e1e1e; color: #d4d4d4; padding: 1rem; border-radius: 6px; overflow-x: auto; margin: 0.875rem 0; }
+        .wechat-render pre code { background: none; padding: 0; color: inherit; font-size: 0.8125rem; }
+        .wechat-render hr { border: none; border-top: 1px solid #e5e7eb; margin: 1rem 0; }
+        .wechat-render img { max-width: 100%; border-radius: 6px; margin: 0.5rem 0; }
+        .wechat-render a { color: #3b82f6; text-decoration: none; }
+
+        /* 排版检查提示 */
+        .format-check-panel {
+            background: #fffbeb;
+            border: 1px solid #fcd34d;
+            border-radius: 0.5rem;
+            padding: 0.875rem;
+            margin-bottom: 1rem;
+            display: none;
+        }
+        .format-check-panel.show { display: block; }
+        .format-check-panel .check-title { font-weight: 600; color: #92400e; margin-bottom: 0.5rem; font-size: 0.875rem; }
+        .format-check-panel .check-item { font-size: 0.8125rem; color: #78350f; padding: 0.25rem 0; display: flex; align-items: flex-start; gap: 0.375rem; }
+
+        /* 编辑器状态栏 */
+        .editor-statusbar {
+            padding: 0.375rem 0.875rem;
+            background: #f9fafb;
+            border-top: 1px solid #e5e7eb;
+            font-size: 0.6875rem;
+            color: #9ca3af;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        /* 移动端：Tab切换模式 */
+        @media (max-width: 768px) {
+            .dual-pane-container { grid-template-columns: 1fr; }
+            .editor-pane { border-right: none; border-bottom: 1px solid #e5e7eb; }
+            #articleContent { min-height: 260px; }
+            .preview-scroll { min-height: 260px; }
+            .editor-toolbar { gap: 0.25rem; padding: 0.5rem; }
+            .toolbar-btn { padding: 0.3125rem 0.5rem; font-size: 0.75rem; }
+            .hot-card { width: 140px !important; min-height: 140px; }
+            .btn-group { flex-direction: column; width: 100%; }
+            .btn-group button { width: 100%; }
+            h1 { font-size: 1.25rem !important; }
+            h2 { font-size: 1.125rem !important; }
+            .max-w-7xl { padding-left: 1rem !important; padding-right: 1rem !important; }
+            #topicInput { font-size: 1rem !important; }
+            #toast { bottom: 1rem; right: 1rem; left: 1rem; max-width: calc(100% - 2rem); font-size: 0.875rem; }
+            .hot-card .text-sm { font-size: 0.75rem !important; }
+            #imageGallery { grid-template-columns: 1fr !important; }
+            .wechat-preview { max-width: 100% !important; }
+            #settingsPanel > div { width: 100% !important; }
+            .empty-state-icon { font-size: 3rem !important; }
+        }
+        @media (max-width: 480px) {
+            h1 { font-size: 1.125rem !important; }
+            .hot-card { width: 120px !important; min-height: 120px; }
+            .hot-card .text-4xl { font-size: 2rem !important; }
+            #generateBtn { font-size: 1rem !important; padding: 0.75rem 1.5rem !important; }
+        }
+        @media (hover: none) and (pointer: coarse) {
+            button, a, .hot-card { min-height: 44px; min-width: 44px; }
+            .hot-card:hover { transform: none; box-shadow: 0 4px 6px rgba(0,0,0,0.07), 0 2px 4px rgba(0,0,0,0.06); }
+            .hot-card:active { transform: scale(0.98); box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+            .btn-primary:hover:not(:disabled) { transform: none; }
+            .btn-primary:active:not(:disabled) { transform: scale(0.98); }
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <!-- 顶部栏 -->
+    <header class="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center text-white font-bold text-xl">苏</div>
+                <h1 class="text-xl sm:text-2xl font-bold text-gray-900">小苏的热事笔记 · 创作台</h1>
+            </div>
+            <button class="text-gray-600 hover:text-gray-900 transition touch-target" onclick="toggleSettings()" aria-label="设置">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                </svg>
+            </button>
+        </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8">
+        <!-- 热点区域 -->
+        <section class="mb-6 sm:mb-8">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-lg font-semibold text-gray-900">🔥 今日热点</h2>
+                <button id="refreshHotBtn"
+                    class="touch-target flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white rounded-lg transition-all duration-200 group shadow-md hover:shadow-lg font-semibold text-sm"
+                    onclick="refreshHotTopics()" aria-label="刷新热点">
+                    <svg class="w-4 h-4 transition-transform duration-500 group-hover:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                    </svg>
+                    <span>换一批</span>
+                </button>
+            </div>
+            <!-- 主题搜索框 -->
+            <div class="flex gap-2 mb-4">
+                <div class="flex-1 flex items-center gap-2 bg-white border border-gray-200 rounded-lg px-3 py-2 shadow-sm focus-within:border-blue-400 focus-within:ring-2 focus-within:ring-blue-100 transition-all">
+                    <svg class="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0"></path>
+                    </svg>
+                    <input type="text" id="topicSearchInput"
+                        class="flex-1 text-sm border-0 focus:ring-0 focus:outline-none text-gray-900 placeholder-gray-400 min-w-0"
+                        placeholder="搜索主题热点，如：AI、体育、娱乐..."
+                        maxlength="30"
+                        onkeydown="if(event.key==='Enter') searchTopics()">
+                    <button id="clearSearchBtn" onclick="clearSearch()" class="text-gray-400 hover:text-gray-600 transition hidden flex-shrink-0" title="清除搜索">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
+                </div>
+                <button id="searchTopicBtn"
+                    class="touch-target flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white rounded-lg transition-all duration-200 shadow-md hover:shadow-lg font-semibold text-sm whitespace-nowrap"
+                    onclick="searchTopics()">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0"></path>
+                    </svg>
+                    <span>搜索</span>
+                </button>
+            </div>
+            <!-- 搜索状态提示 -->
+            <div id="searchStatus" class="hidden mb-3 flex items-center gap-2 text-sm text-blue-600 font-medium">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                <span id="searchStatusText"></span>
+                <button onclick="clearSearch()" class="ml-auto text-gray-500 hover:text-gray-700 underline text-xs">返回热点</button>
+            </div>
+            <div class="relative">
+                <div class="flex flex-wrap gap-3" id="hotTopics">
+                    <div class="skeleton-cards flex flex-wrap gap-3">
+                        <div class="skeleton w-40 h-44 rounded-xl"></div>
+                        <div class="skeleton w-40 h-44 rounded-xl"></div>
+                        <div class="skeleton w-40 h-44 rounded-xl"></div>
+                        <div class="skeleton w-40 h-44 rounded-xl"></div>
+                        <div class="skeleton w-40 h-44 rounded-xl"></div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 话题输入区域 -->
+        <section class="mb-6 sm:mb-8">
+            <h2 class="text-lg font-semibold text-gray-900 mb-4">📝 选定话题</h2>
+            <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+                <input type="text" id="topicInput"
+                    class="w-full text-lg border-0 focus:ring-0 focus:outline-none text-gray-900 placeholder-gray-400"
+                    placeholder="点击上方热点或手动输入话题..." maxlength="50" oninput="validateTopicInput()">
+                <div class="flex justify-between items-center mt-2">
+                    <span id="inputError" class="text-sm text-red-500"></span>
+                    <span id="charCount" class="char-count">0/50</span>
+                </div>
+            </div>
+            
+            <!-- 排版选项 -->
+            <div class="mt-4 bg-gradient-to-r from-purple-50 to-pink-50 rounded-lg border border-purple-200 p-4">
+                <div class="flex items-center gap-2 mb-3">
+                    <span class="text-sm font-semibold text-purple-900">✨ 智能排版选项</span>
+                </div>
+                <div class="space-y-3">
+                    <label class="flex items-center gap-3 cursor-pointer group">
+                        <input type="checkbox" id="addSubtitlesCheck" class="w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500">
+                        <div class="flex-1">
+                            <div class="text-sm font-medium text-gray-900 group-hover:text-purple-700 transition">添加小标题</div>
+                            <div class="text-xs text-gray-500">根据内容自动生成2-4个小标题，提升阅读体验</div>
+                        </div>
+                    </label>
+                    <div class="flex items-center gap-3">
+                        <label class="text-sm font-medium text-gray-700 whitespace-nowrap">段落长度:</label>
+                        <input type="range" id="paragraphLengthRange" min="50" max="200" value="60" step="10"
+                            class="flex-1 h-2 bg-purple-200 rounded-lg appearance-none cursor-pointer accent-purple-600"
+                            oninput="updateParagraphLengthLabel()">
+                        <span id="paragraphLengthLabel" class="text-sm font-semibold text-purple-700 min-w-[60px] text-right">60字</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="mt-6 flex justify-center">
+                <button id="generateBtn"
+                    class="btn-primary px-6 sm:px-8 py-3 bg-blue-600 text-white rounded-lg font-semibold text-base sm:text-lg shadow-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center gap-2 w-full sm:w-auto justify-center"
+                    onclick="handleGenerate()">
+                    <svg class="w-5 sm:w-6 h-5 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                    </svg>
+                    开始生成文章
+                </button>
+            </div>
+        </section>
+
+        <!-- AI工作台 -->
+        <section class="mb-6 sm:mb-8" id="workbench" style="display: none;">
+            <h2 class="text-lg font-semibold text-gray-900 mb-4">💭 AI工作台</h2>
+            <div class="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg shadow-sm border border-blue-100 p-4 sm:p-6">
+                <div class="space-y-3" id="progressSteps"></div>
+                <div class="mt-4">
+                    <div class="bg-white rounded-full h-2 overflow-hidden">
+                        <div id="progressBar" class="progress-bar bg-gradient-to-r from-blue-500 to-indigo-500 h-full" style="width: 0%"></div>
+                    </div>
+                    <div class="mt-2 text-right text-sm text-gray-600"><span id="progressPercent">0%</span></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 生成结果区域 -->
+        <section id="resultSection" style="display: none;">
+
+            <!-- ===== 双栏智能编辑器 ===== -->
+            <div class="mb-6 sm:mb-8 slide-down">
+                <div class="flex justify-between items-center mb-3">
+                    <h2 class="text-lg font-semibold text-gray-900">📄 智能编辑</h2>
+                    <span class="text-sm text-gray-500">字数: <span id="wordCount">0</span></span>
+                </div>
+
+                <!-- 排版检查提示面板 -->
+                <div class="format-check-panel" id="formatCheckPanel">
+                    <div class="check-title">⚠️ 排版检查结果</div>
+                    <div id="formatCheckItems"></div>
+                </div>
+
+                <!-- 编辑器主体 -->
+                <div class="editor-wrapper shadow-sm">
+                    <!-- 工具栏 -->
+                    <div class="editor-toolbar">
+                        <button class="toolbar-btn" onclick="insertFormat('h1')" title="一级标题">H1</button>
+                        <button class="toolbar-btn" onclick="insertFormat('h2')" title="二级标题">H2</button>
+                        <button class="toolbar-btn" onclick="insertFormat('h3')" title="三级标题">H3</button>
+                        <div class="toolbar-divider"></div>
+                        <button class="toolbar-btn" onclick="insertFormat('bold')" title="粗体"><strong>B</strong></button>
+                        <button class="toolbar-btn" onclick="insertFormat('italic')" title="斜体"><em>I</em></button>
+                        <div class="toolbar-divider"></div>
+                        <button class="toolbar-btn" onclick="insertFormat('ul')" title="无序列表">≡ 列表</button>
+                        <button class="toolbar-btn" onclick="insertFormat('quote')" title="引用块">❝ 引用</button>
+                        <button class="toolbar-btn" onclick="insertFormat('hr')" title="分割线">─ 分割</button>
+                        <div class="toolbar-spacer"></div>
+                        <!-- 智能排版下拉菜单 -->
+                        <div class="smart-dropdown" id="smartDropdown">
+                            <button class="smart-dropdown-btn" onclick="toggleSmartDropdown(event)">
+                                ✨ 智能排版 <span style="font-size:0.625rem;">▼</span>
+                            </button>
+                            <div class="smart-dropdown-menu" id="smartDropdownMenu">
+                                <div class="dropdown-section-title">快速操作</div>
+                                <div class="dropdown-item" onclick="applySmartFormat('optimize')">
+                                    <span class="dropdown-item-icon">⚡</span>一键优化（推荐）
+                                </div>
+                                <div class="dropdown-separator"></div>
+                                <div class="dropdown-section-title">单项优化</div>
+                                <div class="dropdown-item" onclick="applySmartFormat('paragraph')">
+                                    <span class="dropdown-item-icon">📝</span>段落优化
+                                </div>
+                                <div class="dropdown-item" onclick="applySmartFormat('heading')">
+                                    <span class="dropdown-item-icon">📌</span>标题美化
+                                </div>
+                                <div class="dropdown-item" onclick="applySmartFormat('list')">
+                                    <span class="dropdown-item-icon">📋</span>列表规范化
+                                </div>
+                                <div class="dropdown-item" onclick="applySmartFormat('check')">
+                                    <span class="dropdown-item-icon">🔍</span>排版检查
+                                </div>
+                                <div class="dropdown-separator"></div>
+                                <div class="dropdown-section-title">应用模板</div>
+                                <div class="dropdown-item" onclick="applyTemplate('news')">
+                                    <span class="dropdown-item-icon">📰</span>新闻简洁风
+                                </div>
+                                <div class="dropdown-item" onclick="applyTemplate('deep')">
+                                    <span class="dropdown-item-icon">📚</span>深度阅读风
+                                </div>
+                                <div class="dropdown-item" onclick="applyTemplate('lively')">
+                                    <span class="dropdown-item-icon">🎉</span>视觉活泼风
+                                </div>
+                                <div class="dropdown-item" onclick="applyTemplate('business')">
+                                    <span class="dropdown-item-icon">💼</span>专业商务风
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 双栏区域 -->
+                    <div class="dual-pane-container">
+                        <!-- 左：编辑区 -->
+                        <div class="editor-pane">
+                            <div class="pane-header">
+                                <span class="pane-header-dot" style="background:#f59e0b;"></span>
+                                Markdown 编辑
+                            </div>
+                            <textarea id="articleContent"
+                                placeholder="生成的文章将显示在这里，支持 Markdown 语法..."
+                                oninput="onEditorInput()" onscroll="syncScrollFromEditor()"
+                                spellcheck="false"></textarea>
+                        </div>
+                        <!-- 右：预览区 -->
+                        <div class="preview-pane">
+                            <div class="pane-header">
+                                <span class="pane-header-dot" style="background:#10b981;"></span>
+                                微信预览（实时）
+                            </div>
+                            <div class="preview-scroll wechat-render" id="previewContent" onscroll="syncScrollFromPreview()">
+                                <p style="color:#9ca3af;text-align:center;padding:3rem 0;">文章预览将实时显示在这里 ✨</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 状态栏 -->
+                    <div class="editor-statusbar">
+                        <span id="editorStatus">就绪</span>
+                        <span>Markdown · 实时预览</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 配图区域 -->
+            <div class="mb-6 sm:mb-8 fade-in">
+                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 mb-4">
+                    <h2 class="text-lg font-semibold text-gray-900">🖼️ 配图</h2>
+                    <div class="flex gap-2 w-full sm:w-auto">
+                        <button class="touch-target text-blue-600 hover:text-blue-700 text-sm font-medium flex items-center gap-1 px-3 py-2 rounded border border-blue-200 hover:bg-blue-50 transition flex-1 sm:flex-none justify-center" onclick="triggerImageUpload()">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                            </svg>
+                            上传本地图片
+                        </button>
+                    </div>
+                </div>
+                <input type="file" id="imageUpload" accept="image/*" multiple style="display: none;" onchange="handleImageUpload(event)">
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4" id="imageGallery"
+                    ondrop="handleImageDrop(event)" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)">
+                </div>
+            </div>
+
+            <!-- 操作按钮 -->
+            <div class="flex flex-col sm:flex-row flex-wrap gap-3 sm:gap-4 justify-center fade-in btn-group">
+                <button class="touch-target px-4 sm:px-6 py-3 bg-white border border-gray-300 rounded-lg font-medium text-gray-700 hover:bg-gray-50 transition flex items-center gap-2 justify-center" onclick="copyMarkdown()">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+                    </svg>
+                    复制Markdown
+                </button>
+                <button class="touch-target px-4 sm:px-6 py-3 bg-white border border-gray-300 rounded-lg font-medium text-gray-700 hover:bg-gray-50 transition flex items-center gap-2 justify-center" onclick="regenerate()">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                    </svg>
+                    重新生成
+                </button>
+                <button class="touch-target px-4 sm:px-6 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition flex items-center gap-2 justify-center" onclick="publishToWechat()">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                    </svg>
+                    发布到微信
+                </button>
+            </div>
+        </section>
+    </main>
+
+    <!-- Toast通知 -->
+    <div id="toast" class="fixed bottom-4 right-4 bg-gray-900 text-white px-6 py-3 rounded-lg shadow-lg transform transition-all duration-300 translate-y-20 opacity-0 z-50">
+        <span id="toastMessage"></span>
+    </div>
+
+    <!-- 设置面板 -->
+    <div id="settingsPanel" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden" onclick="toggleSettings()">
+        <div class="fixed right-0 top-0 bottom-0 w-full sm:w-96 bg-white shadow-xl transform transition-transform overflow-y-auto" onclick="event.stopPropagation()">
+            <div class="p-6">
+                <div class="flex justify-between items-center mb-6">
+                    <h3 class="text-xl font-bold">设置</h3>
+                    <button onclick="toggleSettings()" class="text-gray-500 hover:text-gray-700">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
+                </div>
+                
+                <!-- 人设选择 -->
+                <div class="mb-6">
+                    <h4 class="text-lg font-semibold mb-3 flex items-center gap-2">
+                        <span>👤</span>
+                        <span>写作人设</span>
+                    </h4>
+                    <p class="text-sm text-gray-600 mb-4">选择或自定义人设风格，让文章更有个性</p>
+                    
+                    <!-- 当前人设显示 -->
+                    <div id="currentPersonaDisplay" class="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                        <div class="flex items-center gap-2 text-sm text-blue-900">
+                            <span class="text-xl" id="currentPersonaIcon">👁️</span>
+                            <div class="flex-1">
+                                <div class="font-semibold" id="currentPersonaName">热点事件观察者</div>
+                                <div class="text-xs text-blue-700" id="currentPersonaDesc">客观理性，注重事实...</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 人设列表 -->
+                    <div id="personaList" class="space-y-2 mb-4">
+                        <!-- 通过JS动态加载 -->
+                    </div>
+                    
+                    <!-- 自定义人设按钮 -->
+                    <button onclick="showCustomPersonaForm()" 
+                        class="w-full px-4 py-2 border-2 border-dashed border-gray-300 rounded-lg text-gray-600 hover:border-blue-400 hover:text-blue-600 transition flex items-center justify-center gap-2">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                        </svg>
+                        <span>创建自定义人设</span>
+                    </button>
+                </div>
+                
+                <div class="space-y-4 pt-4 border-t border-gray-200">
+                    <div class="text-gray-600">
+                        <p class="mb-2 text-sm font-semibold">✨ 更多功能即将上线</p>
+                        <ul class="text-sm space-y-2 text-gray-500">
+                            <li>• 主题切换</li>
+                            <li>• 历史记录</li>
+                            <li>• 快捷键设置</li>
+                            <li>• 自动保存</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ===== 全局变量 =====
+        let currentTopic = '';
+        let currentTitle = '';
+        let currentContent = '';
+        let currentImages = [];
+        let selectedCard = null;
+        let eventSource = null;
+        let reconnectAttempts = 0;
+        const MAX_RECONNECT_ATTEMPTS = 3;
+        const RECONNECT_DELAY = 2000;
+        let currentOffset = 0;
+        let isSyncingScroll = false;  // 防止滚动同步循环
+        let selectedPersonaId = null; // 当前选中的人设ID
+
+        // ===== marked.js 配置 =====
+        if (typeof marked !== 'undefined') {
+            marked.setOptions({
+                breaks: true,       // 单换行转 <br>
+                gfm: true,          // GitHub Flavored Markdown
+            });
+        }
+
+        // ===== 防抖函数 =====
+        function debounce(func, wait) {
+            let timeout;
+            return function executedFunction(...args) {
+                const later = () => { clearTimeout(timeout); func(...args); };
+                clearTimeout(timeout);
+                timeout = setTimeout(later, wait);
+            };
+        }
+
+        // ===== 页面初始化 =====
+        window.onload = function() {
+            loadHotTopics();
+            loadPersonas(); // 加载人设列表
+            updateParagraphLengthLabel(); // 初始化段落长度标签
+            // 点击其他区域关闭下拉菜单
+            document.addEventListener('click', function(e) {
+                const dropdown = document.getElementById('smartDropdown');
+                if (dropdown && !dropdown.contains(e.target)) {
+                    closeSmartDropdown();
+                }
+            });
+        };
+
+        // ===== 加载热点 =====
+        async function loadHotTopics(forceRefresh = false) {
+            try {
+                if (forceRefresh) {
+                    currentOffset += 10;
+                    if (currentOffset >= 30) currentOffset = 0;
+                }
+                const timestamp = Date.now();
+                const url = `/api/hot?offset=${currentOffset}&limit=10&t=${timestamp}${forceRefresh ? '&refresh=1' : ''}`;
+                const response = await fetch(url, {
+                    cache: 'no-cache',
+                    headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' }
+                });
+                if (!response.ok) throw new Error('网络请求失败');
+                const topics = await response.json();
+                renderHotTopics(topics, forceRefresh);
+            } catch (error) {
+                console.error('加载热点失败:', error);
+                renderHotTopicsError();
+            }
+        }
+
+        function getHeatLevel(heatValue) {
+            if (!heatValue) return 'low';
+            const match = heatValue.match(/[\d.]+/);
+            if (!match) return 'low';
+            const num = parseFloat(match[0]);
+            const unit = heatValue.includes('万') ? 10000 : 1;
+            const value = num * unit;
+            if (value >= 100000) return 'high';
+            if (value >= 50000) return 'medium';
+            return 'low';
+        }
+
+        function generateTopicIcon(topic, index) {
+            if (topic.icon) return topic.icon;
+            const title = topic.title.toLowerCase();
+            const keywordIcons = {
+                '科技|AI|人工智能|芯片|手机|电脑|网络|互联网': '💻',
+                '经济|股市|金融|投资|货币|贸易': '💰',
+                '娱乐|明星|电影|音乐|综艺': '🎬',
+                '体育|足球|篮球|奥运|比赛': '⚽',
+                '政治|政府|外交|选举': '🏛️',
+                '社会|民生|教育|医疗': '👥',
+                '军事|国防|武器': '🎖️',
+                '环境|气候|环保|污染': '🌍',
+                '健康|医学|疾病|药物': '🏥',
+                '旅游|景点|假期': '✈️',
+                '美食|餐饮|食品': '🍜',
+                '游戏|电竞': '🎮',
+                '汽车|交通': '🚗',
+                '房产|建筑': '🏠',
+                '文化|艺术|展览': '🎨',
+                '科学|研究|发现': '🔬',
+                '太空|航天|火箭': '🚀',
+                '动物|宠物': '🐾',
+                '天气|灾害|地震': '⛈️',
+                '法律|犯罪|案件': '⚖️'
+            };
+            for (const [keywords, icon] of Object.entries(keywordIcons)) {
+                if (keywords.split('|').some(kw => title.includes(kw))) return icon;
+            }
+            const defaultIcons = ['📰', '📌', '💡', '🔔', '⭐', '🎯', '📣', '🌟', '💬', '🎪', '🎭', '🎨', '🎬', '📸', '🎵'];
+            return defaultIcons[index % defaultIcons.length];
+        }
+
+        function renderHotTopics(topics, isRefresh = false) {
+            const container = document.getElementById('hotTopics');
+            container.innerHTML = '';
+            if (!topics || topics.length === 0) { renderHotTopicsEmpty(); return; }
+            if (isRefresh) {
+                const now = new Date();
+                const timeStr = `${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}`;
+                showToast(`✅ 热点已更新 (${timeStr})`);
+            }
+            const displayTopics = topics.slice(0, 7);
+            displayTopics.forEach((topic, index) => {
+                const card = document.createElement('div');
+                const heatLevel = getHeatLevel(topic.heat);
+                const topicIcon = generateTopicIcon(topic, index);
+                card.className = `hot-card heat-${heatLevel} w-40 bg-white rounded-xl border-2 border-gray-200 p-4 cursor-pointer flex flex-col items-center text-center`;
+                card.innerHTML = `
+                    <div class="topic-tooltip">
+                        <div class="font-semibold mb-1">${topic.title}</div>
+                        <div class="text-xs opacity-90">点击选择此话题</div>
+                    </div>
+                    <div class="text-4xl mb-2">${topicIcon}</div>
+                    <div class="text-sm font-medium text-gray-900 leading-snug mb-3 flex-1">${topic.title}</div>
+                    <div class="heat-value-display">🔥 ${topic.heat || '-'}</div>
+                `;
+                card.onclick = () => selectTopic(topic.title, card);
+                container.appendChild(card);
+            });
+        }
+
+        function renderHotTopicsEmpty() {
+            document.getElementById('hotTopics').innerHTML = `
+                <div class="empty-state w-full"><div class="empty-state-icon">📭</div>
+                <p class="text-gray-600 mb-4">暂无热点数据</p>
+                <button onclick="loadHotTopics()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">重新加载</button></div>`;
+        }
+
+        function renderHotTopicsError() {
+            document.getElementById('hotTopics').innerHTML = `
+                <div class="empty-state w-full"><div class="empty-state-icon">⚠️</div>
+                <p class="text-gray-600 mb-4">加载失败，请检查网络连接</p>
+                <button onclick="loadHotTopics()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">重试</button></div>`;
+        }
+
+        function selectTopic(title, cardElement) {
+            if (selectedCard) selectedCard.classList.remove('selected');
+            if (cardElement) { cardElement.classList.add('selected'); selectedCard = cardElement; }
+            document.getElementById('topicInput').value = title;
+            currentTopic = title;
+            validateTopicInput();
+        }
+
+        function validateTopicInput() {
+            const input = document.getElementById('topicInput');
+            const charCount = document.getElementById('charCount');
+            const errorMsg = document.getElementById('inputError');
+            const value = input.value.trim();
+            const length = value.length;
+            charCount.textContent = `${length}/50`;
+            if (length === 0) { charCount.className = 'char-count'; errorMsg.textContent = ''; return false; }
+            else if (length < 2) { charCount.className = 'char-count error'; errorMsg.textContent = '话题至少需要2个字'; return false; }
+            else if (length > 45) { charCount.className = 'char-count warning'; errorMsg.textContent = ''; return true; }
+            else { charCount.className = 'char-count'; errorMsg.textContent = ''; return true; }
+        }
+
+        // 更新段落长度标签显示
+        function updateParagraphLengthLabel() {
+            const range = document.getElementById('paragraphLengthRange');
+            const label = document.getElementById('paragraphLengthLabel');
+            if (range && label) {
+                label.textContent = range.value + '字';
+            }
+        }
+
+        const handleGenerate = debounce(function() {
+            const topic = document.getElementById('topicInput').value.trim();
+            if (!validateTopicInput() || topic.length < 2) { showToast('❌ 请输入至少2个字的话题'); return; }
+            currentTopic = topic;
+            startGeneration(topic);
+        }, 300);
+
+        async function startGeneration(topic) {
+            const generateBtn = document.getElementById('generateBtn');
+            generateBtn.disabled = true;
+            generateBtn.innerHTML = '<svg class="w-5 h-5 spinning" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>生成中...';
+            document.getElementById('workbench').style.display = 'block';
+            document.getElementById('resultSection').style.display = 'none';
+            const progressSteps = document.getElementById('progressSteps');
+            progressSteps.innerHTML = '';
+            document.getElementById('progressBar').style.width = '0%';
+            document.getElementById('progressPercent').textContent = '0%';
+            const steps = [
+                { step: 1, name: '资料收集中...', detail: '正在收集相关资料' },
+                { step: 2, name: '深度思考中...', detail: '正在分析热点背后的本质问题' },
+                { step: 3, name: '初稿写作中...', detail: '基于思考生成文章框架' },
+                { step: 4, name: '第一轮润色中...', detail: '优化语言表达和逻辑' },
+                { step: 5, name: '第二轮润色中...', detail: '增强可读性和感染力' },
+                { step: 6, name: '生成标题中...', detail: '提炼核心观点' },
+                { step: 7, name: '生成配图中...', detail: '自动匹配相关图片' },
+            ];
+            steps.forEach(step => {
+                const stepEl = document.createElement('div');
+                stepEl.className = 'flex items-start gap-3';
+                stepEl.innerHTML = `
+                    <div class="flex-shrink-0 mt-1">
+                        <div class="step-icon w-6 h-6 rounded-full border-2 border-gray-300 flex items-center justify-center" id="step-${step.step}">
+                            <div class="w-3 h-3 bg-gray-300 rounded-full"></div>
+                        </div>
+                    </div>
+                    <div class="flex-1">
+                        <div class="font-medium text-gray-900" id="step-name-${step.step}">${step.name}</div>
+                        <div class="text-sm text-gray-600" id="step-detail-${step.step}">${step.detail}</div>
+                    </div>`;
+                progressSteps.appendChild(stepEl);
+            });
+            connectSSE(topic);
+        }
+
+        function connectSSE(topic) {
+            if (eventSource) eventSource.close();
+            
+            // 获取排版参数
+            const addSubtitles = document.getElementById('addSubtitlesCheck').checked;
+            const paragraphLength = document.getElementById('paragraphLengthRange').value;
+            
+            // 构建URL，包含排版参数和人设ID
+            const personaParam = selectedPersonaId ? `&persona_id=${encodeURIComponent(selectedPersonaId)}` : '';
+            const url = `/api/generate?topic=${encodeURIComponent(topic)}&add_subtitles=${addSubtitles}&paragraph_length=${paragraphLength}${personaParam}`;
+            
+            eventSource = new EventSource(url);
+            eventSource.addEventListener('progress', (e) => {
+                const data = JSON.parse(e.data);
+                updateProgress(data);
+                reconnectAttempts = 0;
+            });
+            eventSource.addEventListener('complete', (e) => {
+                const data = JSON.parse(e.data);
+                currentTitle = data.title;
+                currentContent = data.content;
+                currentImages = data.images || [];
+                completeGeneration();
+                eventSource.close();
+                eventSource = null;
+            });
+            eventSource.onerror = (e) => {
+                console.error('SSE错误:', e);
+                eventSource.close();
+                eventSource = null;
+                if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+                    reconnectAttempts++;
+                    showToast(`⚠️ 连接中断，正在重连... (${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})`);
+                    setTimeout(() => connectSSE(topic), RECONNECT_DELAY);
+                } else {
+                    showToast('❌ 生成失败，请重试');
+                    const generateBtn = document.getElementById('generateBtn');
+                    generateBtn.disabled = false;
+                    generateBtn.innerHTML = '<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>开始生成文章';
+                    reconnectAttempts = 0;
+                }
+            };
+        }
+
+        function updateProgress(data) {
+            const stepIcon = document.getElementById(`step-${data.step}`);
+            const stepName = document.getElementById(`step-name-${data.step}`);
+            const stepDetail = document.getElementById(`step-detail-${data.step}`);
+            if (stepName) stepName.textContent = data.name;
+            if (stepDetail) stepDetail.textContent = data.detail;
+            if (data.status === 'running') {
+                stepIcon.classList.remove('border-gray-300', 'border-green-500');
+                stepIcon.classList.add('border-blue-500', 'pulsing');
+                stepIcon.innerHTML = '<svg class="w-4 h-4 text-blue-500 spinning" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>';
+            } else if (data.status === 'completed') {
+                stepIcon.classList.remove('border-gray-300', 'border-blue-500', 'pulsing');
+                stepIcon.classList.add('border-green-500');
+                stepIcon.innerHTML = '<svg class="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>';
+                const progress = Math.round((data.step / 7) * 100);
+                document.getElementById('progressBar').style.width = progress + '%';
+                document.getElementById('progressPercent').textContent = progress + '%';
+            }
+        }
+
+        function completeGeneration() {
+            setTimeout(() => {
+                document.getElementById('workbench').style.display = 'none';
+                document.getElementById('resultSection').style.display = 'block';
+                const titleLine = `# ${currentTitle}`;
+                const hasTitle = currentContent.trimStart().startsWith(titleLine) || currentContent.trimStart().startsWith(currentTitle);
+                const fullContent = hasTitle ? currentContent : `${titleLine}\n\n${currentContent}`;
+                document.getElementById('articleContent').value = fullContent;
+                updateWordCount();
+                renderPreview();
+                renderImages();
+                const generateBtn = document.getElementById('generateBtn');
+                generateBtn.disabled = false;
+                generateBtn.innerHTML = '<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>开始生成文章';
+                showToast('✨ 文章生成完成！');
+            }, 500);
+        }
+
+        // ===== 编辑器核心功能 =====
+
+        // 编辑器输入事件（带防抖）
+        const debouncedRender = debounce(renderPreview, 250);
+        function onEditorInput() {
+            updateWordCount();
+            debouncedRender();
+            updateEditorStatus();
+        }
+
+        // 实时渲染预览
+        function renderPreview() {
+            const content = document.getElementById('articleContent').value;
+            const previewEl = document.getElementById('previewContent');
+            if (!content.trim()) {
+                previewEl.innerHTML = '<p style="color:#9ca3af;text-align:center;padding:3rem 0;">文章预览将实时显示在这里 ✨</p>';
+                return;
+            }
+            try {
+                let html = marked.parse(content);
+                // 注入图片到预览
+                if (currentImages.length > 0) {
+                    const imgHtml = currentImages.map((url, i) =>
+                        `<img src="${url}" alt="配图${i+1}" style="max-width:100%;border-radius:6px;margin:0.5rem 0;" loading="lazy">`
+                    ).join('');
+                    html += imgHtml;
+                }
+                previewEl.innerHTML = html;
+            } catch(e) {
+                previewEl.innerHTML = `<pre style="color:#ef4444;">${content}</pre>`;
+            }
+        }
+
+        // 更新编辑器状态栏
+        function updateEditorStatus() {
+            const content = document.getElementById('articleContent').value;
+            const lines = content.split('\n').length;
+            const chars = content.replace(/\s/g, '').length;
+            document.getElementById('editorStatus').textContent = `${lines} 行 · ${chars} 字`;
+        }
+
+        // ===== 同步滚动 =====
+        function syncScrollFromEditor() {
+            if (isSyncingScroll) return;
+            isSyncingScroll = true;
+            const editor = document.getElementById('articleContent');
+            const preview = document.getElementById('previewContent');
+            const ratio = editor.scrollTop / (editor.scrollHeight - editor.clientHeight || 1);
+            preview.scrollTop = ratio * (preview.scrollHeight - preview.clientHeight);
+            requestAnimationFrame(() => { isSyncingScroll = false; });
+        }
+
+        function syncScrollFromPreview() {
+            if (isSyncingScroll) return;
+            isSyncingScroll = true;
+            const editor = document.getElementById('articleContent');
+            const preview = document.getElementById('previewContent');
+            const ratio = preview.scrollTop / (preview.scrollHeight - preview.clientHeight || 1);
+            editor.scrollTop = ratio * (editor.scrollHeight - editor.clientHeight);
+            requestAnimationFrame(() => { isSyncingScroll = false; });
+        }
+
+        // ===== Markdown格式插入 =====
+        function insertFormat(type) {
+            const textarea = document.getElementById('articleContent');
+            const start = textarea.selectionStart;
+            const end = textarea.selectionEnd;
+            const selected = textarea.value.substring(start, end);
+            const before = textarea.value.substring(0, start);
+            const after = textarea.value.substring(end);
+
+            let insert = '';
+            let cursorOffset = 0;
+
+            switch(type) {
+                case 'h1':
+                    insert = `# ${selected || '一级标题'}`;
+                    cursorOffset = selected ? insert.length : 2;
+                    break;
+                case 'h2':
+                    insert = `## ${selected || '二级标题'}`;
+                    cursorOffset = selected ? insert.length : 3;
+                    break;
+                case 'h3':
+                    insert = `### ${selected || '三级标题'}`;
+                    cursorOffset = selected ? insert.length : 4;
+                    break;
+                case 'bold':
+                    insert = `**${selected || '粗体文字'}**`;
+                    cursorOffset = selected ? insert.length : 2;
+                    break;
+                case 'italic':
+                    insert = `*${selected || '斜体文字'}*`;
+                    cursorOffset = selected ? insert.length : 1;
+                    break;
+                case 'ul':
+                    insert = selected
+                        ? selected.split('\n').map(line => `- ${line}`).join('\n')
+                        : '- 列表项1\n- 列表项2\n- 列表项3';
+                    cursorOffset = insert.length;
+                    break;
+                case 'quote':
+                    insert = selected
+                        ? selected.split('\n').map(line => `> ${line}`).join('\n')
+                        : '> 这里是引用内容';
+                    cursorOffset = insert.length;
+                    break;
+                case 'hr':
+                    insert = '\n\n---\n\n';
+                    cursorOffset = insert.length;
+                    break;
+            }
+
+            // 确保标题前有换行
+            const needsNewline = ['h1','h2','h3','ul','quote'].includes(type) && before.length > 0 && !before.endsWith('\n');
+            const prefix = needsNewline ? '\n' : '';
+
+            textarea.value = before + prefix + insert + after;
+            const newCursor = start + prefix.length + (selected ? insert.length : cursorOffset);
+            textarea.setSelectionRange(
+                selected ? start + prefix.length : newCursor,
+                selected ? start + prefix.length + insert.length : newCursor
+            );
+            textarea.focus();
+            onEditorInput();
+        }
+
+        // ===== 智能排版下拉菜单 =====
+        function toggleSmartDropdown(event) {
+            event.stopPropagation();
+            const menu = document.getElementById('smartDropdownMenu');
+            const isOpen = menu.style.display === 'block';
+            menu.style.display = isOpen ? 'none' : 'block';
+        }
+
+        function closeSmartDropdown() {
+            const menu = document.getElementById('smartDropdownMenu');
+            if (menu) menu.style.display = 'none';
+        }
+
+        // ===== 智能排版算法 =====
+        function applySmartFormat(type) {
+            closeSmartDropdown();
+            const textarea = document.getElementById('articleContent');
+            let content = textarea.value;
+
+            if (!content.trim()) { showToast('❌ 请先生成或输入文章内容'); return; }
+
+            switch(type) {
+                case 'optimize':
+                    content = formatParagraph(content);
+                    content = formatHeading(content);
+                    content = formatList(content);
+                    showToast('✅ 一键优化完成！');
+                    break;
+                case 'paragraph':
+                    content = formatParagraph(content);
+                    showToast('✅ 段落优化完成');
+                    break;
+                case 'heading':
+                    content = formatHeading(content);
+                    showToast('✅ 标题美化完成');
+                    break;
+                case 'list':
+                    content = formatList(content);
+                    showToast('✅ 列表规范化完成');
+                    break;
+                case 'check':
+                    runFormatCheck(content);
+                    return;
+            }
+
+            textarea.value = content;
+            onEditorInput();
+        }
+
+        // 段落优化
+        function formatParagraph(content) {
+            // 清除3个及以上连续空行，统一为2个空行
+            content = content.replace(/\n{3,}/g, '\n\n');
+            // 去除行尾多余空格
+            content = content.replace(/[ \t]+$/gm, '');
+            // 确保段落之间有空行（非标题行且不是空行的相邻文字行）
+            content = content.replace(/([^\n#\-*>])\n([^\n#\-*>])/g, '$1\n\n$2');
+            // 去除首尾多余空白
+            content = content.trim();
+            return content;
+        }
+
+        // 标题美化（为标题添加适当的emoji前缀）
+        function formatHeading(content) {
+            const headingEmojis = {
+                1: ['📌', '🔥', '💡', '🎯', '⚡', '🌟'],
+                2: ['📍', '▶', '◆', '🔷', '📎', '✦'],
+            };
+            let h1Count = 0, h2Count = 0;
+            content = content.replace(/^(#{1,3})\s+(.+)$/gm, (match, hashes, title) => {
+                // 如果标题已有emoji前缀，跳过
+                if (/^[\u{1F300}-\u{1F9FF}▶◆✦📌📍]/u.test(title.trim())) return match;
+                const level = hashes.length;
+                if (level === 1) {
+                    // 一级标题不加emoji，保持简洁
+                    return match;
+                } else if (level === 2) {
+                    const emoji = headingEmojis[2][h2Count % headingEmojis[2].length];
+                    h2Count++;
+                    return `${hashes} ${emoji} ${title}`;
+                }
+                return match;
+            });
+            return content;
+        }
+
+        // 列表规范化
+        function formatList(content) {
+            // 统一 * 列表符号为 -
+            content = content.replace(/^\* (.+)$/gm, '- $1');
+            // 移除列表项前多余的空行
+            content = content.replace(/(\n- .+)\n\n(- .+)/g, '$1\n$2');
+            return content;
+        }
+
+        // 排版检查
+        function runFormatCheck(content) {
+            const panel = document.getElementById('formatCheckPanel');
+            const items = document.getElementById('formatCheckItems');
+            const issues = [];
+
+            // 检查是否有标题
+            if (!/^#{1,3}\s/m.test(content)) {
+                issues.push({ icon: '⚠️', text: '文章缺少标题，建议使用 # 添加一个主标题' });
+            }
+            // 检查段落过长
+            const paragraphs = content.split(/\n\n+/);
+            const longParas = paragraphs.filter(p => !p.startsWith('#') && !p.startsWith('-') && p.replace(/\s/g,'').length > 300);
+            if (longParas.length > 0) {
+                issues.push({ icon: '📝', text: `有 ${longParas.length} 个段落超过300字，建议拆分为多个短段落` });
+            }
+            // 检查连续空行
+            if (/\n{3,}/.test(content)) {
+                issues.push({ icon: '🔧', text: '文中存在多余空行，建议使用"段落优化"功能清理' });
+            }
+            // 检查是否过短
+            const wordCount = content.replace(/\s/g, '').length;
+            if (wordCount < 300) {
+                issues.push({ icon: '📏', text: `文章较短（${wordCount}字），微信公众号文章建议至少500字` });
+            }
+            // 检查标题层级
+            const h1Count = (content.match(/^# /gm) || []).length;
+            if (h1Count > 1) {
+                issues.push({ icon: '🏷️', text: `文章有 ${h1Count} 个一级标题，建议只保留1个主标题` });
+            }
+
+            if (issues.length === 0) {
+                items.innerHTML = '<div class="check-item">✅ 排版检查通过！格式规范，可以发布。</div>';
+            } else {
+                items.innerHTML = issues.map(issue =>
+                    `<div class="check-item"><span>${issue.icon}</span><span>${issue.text}</span></div>`
+                ).join('');
+            }
+
+            panel.classList.add('show');
+            panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            showToast(`🔍 发现 ${issues.length} 个排版问题`);
+        }
+
+        // ===== 排版模板 =====
+        function applyTemplate(template) {
+            closeSmartDropdown();
+            const textarea = document.getElementById('articleContent');
+            let content = textarea.value;
+            if (!content.trim()) { showToast('❌ 请先生成文章内容'); return; }
+
+            if (!confirm(`确定应用"${getTemplateName(template)}"模板吗？此操作会修改文章格式。`)) return;
+
+            switch(template) {
+                case 'news':
+                    content = applyNewsTemplate(content);
+                    break;
+                case 'deep':
+                    content = applyDeepTemplate(content);
+                    break;
+                case 'lively':
+                    content = applyLivelyTemplate(content);
+                    break;
+                case 'business':
+                    content = applyBusinessTemplate(content);
+                    break;
+            }
+
+            textarea.value = content;
+            onEditorInput();
+            showToast(`✅ 已应用"${getTemplateName(template)}"模板`);
+        }
+
+        function getTemplateName(t) {
+            return { news: '新闻简洁风', deep: '深度阅读风', lively: '视觉活泼风', business: '专业商务风' }[t] || t;
+        }
+
+        // 新闻简洁风：精简段落，去除装饰性emoji
+        function applyNewsTemplate(content) {
+            content = formatParagraph(content);
+            content = formatList(content);
+            // 去除二级标题的emoji
+            content = content.replace(/^(#{2,3})\s+[\u{1F000}-\u{1FFFF}▶◆✦📌📍]\s*/gmu, '$1 ');
+            return content;
+        }
+
+        // 深度阅读风：增加引用块、分割线
+        function applyDeepTemplate(content) {
+            content = formatParagraph(content);
+            content = formatHeading(content);
+            // 在一级标题后添加导语分割线
+            content = content.replace(/^(# .+)$/m, '$1\n\n---\n');
+            return content;
+        }
+
+        // 视觉活泼风：添加更多emoji，增加间距
+        function applyLivelyTemplate(content) {
+            content = formatParagraph(content);
+            // 为二级标题添加emoji
+            const livelyEmojis = ['🎯', '🔥', '💡', '✨', '🚀', '🎉', '💪', '🌈'];
+            let idx = 0;
+            content = content.replace(/^(##\s+)(?![\u{1F000}-\u{1FFFF}🎯🔥💡✨🚀🎉💪🌈])/gmu, (m, hashes) => {
+                const emoji = livelyEmojis[idx++ % livelyEmojis.length];
+                return `${hashes}${emoji} `;
+            });
+            return content;
+        }
+
+        // 专业商务风：规范标题、强调数据
+        function applyBusinessTemplate(content) {
+            content = formatParagraph(content);
+            content = formatList(content);
+            // 去除所有emoji（保留文字内容）
+            content = content.replace(/[\u{1F000}-\u{1FFFF}]/gu, '');
+            content = content.replace(/^(#{2,3}\s+)/gm, '$1');
+            return content.trim();
+        }
+
+        // ===== 更新字数 =====
+        function updateWordCount() {
+            const content = document.getElementById('articleContent').value;
+            const count = content.replace(/\s/g, '').length;
+            document.getElementById('wordCount').textContent = count;
+        }
+
+        // ===== 复制Markdown =====
+        function copyMarkdown() {
+            const content = document.getElementById('articleContent').value;
+            if (!content) { showToast('❌ 没有可复制的内容'); return; }
+            navigator.clipboard.writeText(content).then(() => {
+                showToast('✅ 已复制到剪贴板');
+            }).catch(() => { showToast('❌ 复制失败'); });
+        }
+
+        // ===== 重新生成 =====
+        function regenerate() {
+            if (!currentTopic) { showToast('❌ 请先选择话题'); return; }
+            if (confirm('确定要重新生成吗？当前内容将被覆盖。')) startGeneration(currentTopic);
+        }
+
+        // ===== 发布到微信 =====
+        async function publishToWechat() {
+            const content = document.getElementById('articleContent').value;
+            if (!currentTitle || !content) { showToast('❌ 请先生成文章'); return; }
+            if (!confirm('确定要发布到微信公众号吗？')) return;
+            try {
+                showToast('🚀 正在发布...');
+                const response = await fetch('/api/publish', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ title: currentTitle, content: content, images: currentImages })
+                });
+                if (!response.ok) throw new Error('发布请求失败');
+                const result = await response.json();
+                if (result.success) showToast('✅ 发布成功！');
+                else showToast('❌ ' + (result.message || '发布失败'));
+            } catch (error) {
+                console.error('发布失败:', error);
+                showToast('❌ 发布失败，请检查网络连接');
+            }
+        }
+
+        // ===== 渲染图片 =====
+        function renderImages() {
+            const gallery = document.getElementById('imageGallery');
+            gallery.innerHTML = '';
+            if (!currentImages || currentImages.length === 0) {
+                gallery.innerHTML = `<div class="col-span-full empty-state"><div class="empty-state-icon">🖼️</div>
+                    <p class="text-gray-600 mb-4">暂无配图</p>
+                    <button onclick="triggerImageUpload()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">上传图片</button></div>`;
+                return;
+            }
+            currentImages.forEach((imageUrl, index) => {
+                const card = document.createElement('div');
+                card.className = 'image-card bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden group relative';
+                card.innerHTML = `
+                    <img src="${imageUrl}" alt="配图${index+1}" class="w-full h-48 object-cover" onerror="handleImageError(this)" loading="lazy">
+                    <div class="image-overlay absolute inset-0 bg-black bg-opacity-50 opacity-0 transition-opacity flex items-center justify-center gap-2">
+                        <button class="touch-target px-3 py-2 bg-white rounded text-sm font-medium text-gray-700 hover:bg-gray-100" onclick="deleteImage(${index})">🗑️ 删除</button>
+                    </div>
+                    <div class="p-3"><div class="text-sm font-medium text-gray-900">配图 ${index+1}</div></div>`;
+                gallery.appendChild(card);
+            });
+            // 图片变更后刷新预览
+            renderPreview();
+        }
+
+        function handleImageError(img) {
+            img.src = 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22300%22 height=%22200%22%3E%3Crect fill=%22%23f3f4f6%22 width=%22300%22 height=%22200%22/%3E%3Ctext x=%2250%25%22 y=%2250%25%22 dominant-baseline=%22middle%22 text-anchor=%22middle%22 font-family=%22sans-serif%22 font-size=%2218%22 fill=%22%239ca3af%22%3E图片加载失败%3C/text%3E%3C/svg%3E';
+        }
+
+        function triggerImageUpload() { document.getElementById('imageUpload').click(); }
+
+        function handleImageUpload(event) {
+            const files = event.target.files;
+            if (!files || files.length === 0) return;
+            Array.from(files).forEach(file => {
+                if (!file.type.startsWith('image/')) { showToast('❌ 请上传图片文件'); return; }
+                if (file.size > 10 * 1024 * 1024) { showToast('❌ 图片大小不能超过10MB'); return; }
+                if (file.size > 1024 * 1024) showToast(`🔄 正在压缩图片 (${(file.size/1024/1024).toFixed(2)}MB)...`);
+                compressAndUploadImage(file);
+            });
+            event.target.value = '';
+        }
+
+        function compressAndUploadImage(file) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const img = new Image();
+                img.onload = function() {
+                    const MAX_SIZE = 1200;
+                    let { width, height } = img;
+                    if (width > height) { if (width > MAX_SIZE) { height = Math.round(height * MAX_SIZE / width); width = MAX_SIZE; } }
+                    else { if (height > MAX_SIZE) { width = Math.round(width * MAX_SIZE / height); height = MAX_SIZE; } }
+                    const canvas = document.createElement('canvas');
+                    canvas.width = width; canvas.height = height;
+                    const ctx = canvas.getContext('2d');
+                    ctx.imageSmoothingEnabled = true;
+                    ctx.imageSmoothingQuality = 'high';
+                    ctx.drawImage(img, 0, 0, width, height);
+                    canvas.toBlob(function(blob) {
+                        const r2 = new FileReader();
+                        r2.onload = function(ev) {
+                            const orig = (file.size / 1024 / 1024).toFixed(2);
+                            const comp = (blob.size / 1024 / 1024).toFixed(2);
+                            const ratio = ((1 - blob.size / file.size) * 100).toFixed(1);
+                            currentImages.push(ev.target.result);
+                            renderImages();
+                            if (file.size > 1024 * 1024) showToast(`✅ 图片已压缩上传 (${orig}MB → ${comp}MB, 压缩${ratio}%)`);
+                            else showToast('✅ 图片上传成功');
+                        };
+                        r2.readAsDataURL(blob);
+                    }, file.type, 0.85);
+                };
+                img.onerror = () => showToast('❌ 图片加载失败，请重试');
+                img.src = e.target.result;
+            };
+            reader.onerror = () => showToast('❌ 图片读取失败，请重试');
+            reader.readAsDataURL(file);
+        }
+
+        function handleDragOver(event) { event.preventDefault(); event.currentTarget.classList.add('drag-over'); }
+        function handleDragLeave(event) { event.currentTarget.classList.remove('drag-over'); }
+        function handleImageDrop(event) {
+            event.preventDefault();
+            event.currentTarget.classList.remove('drag-over');
+            const files = event.dataTransfer.files;
+            if (files.length > 0) handleImageUpload({ target: { files, value: '' } });
+        }
+        function deleteImage(index) {
+            if (confirm('确定要删除这张图片吗？')) {
+                currentImages.splice(index, 1);
+                renderImages();
+                showToast('✅ 图片已删除');
+            }
+        }
+
+        function toggleSettings() {
+            document.getElementById('settingsPanel').classList.toggle('hidden');
+        }
+
+        function showToast(message) {
+            const toast = document.getElementById('toast');
+            document.getElementById('toastMessage').textContent = message;
+            toast.classList.remove('translate-y-20', 'opacity-0');
+            toast.classList.add('translate-y-0', 'opacity-100');
+            setTimeout(() => {
+                toast.classList.remove('translate-y-0', 'opacity-100');
+                toast.classList.add('translate-y-20', 'opacity-0');
+            }, 3000);
+        }
+
+        // ===== 人设功能 =====
+        async function loadPersonas() {
+            try {
+                const personasRes = await fetch('/api/personas');
+                if (!personasRes.ok) throw new Error('请求失败');
+                const data = await personasRes.json();
+                
+                // 正确提取personas数组和当前人设ID
+                const personas = data.personas;
+                const currentPersonaId = data.current_persona_id;
+                
+                // 找到当前人设对象
+                const currentPersona = personas.find(p => p.id === currentPersonaId);
+                
+                selectedPersonaId = currentPersonaId;
+                renderPersonaList(personas, currentPersonaId);
+                
+                if (currentPersona) {
+                    updateCurrentPersonaDisplay(currentPersona);
+                }
+            } catch (error) {
+                console.error('加载人设失败:', error);
+                // 失败时显示默认状态，不影响其他功能
+            }
+        }
+
+        function updateCurrentPersonaDisplay(persona) {
+            if (!persona) return;
+            const iconEl = document.getElementById('currentPersonaIcon');
+            const nameEl = document.getElementById('currentPersonaName');
+            const descEl = document.getElementById('currentPersonaDesc');
+            if (iconEl) iconEl.textContent = persona.icon || '👤';
+            if (nameEl) nameEl.textContent = persona.name || '默认';
+            if (descEl) descEl.textContent = (persona.description || '').slice(0, 30) + ((persona.description || '').length > 30 ? '...' : '');
+        }
+
+        function renderPersonaList(personas, currentId) {
+            const container = document.getElementById('personaList');
+            if (!personas || personas.length === 0) {
+                container.innerHTML = '<p class="text-sm text-gray-500 text-center py-2">暂无人设</p>';
+                return;
+            }
+            container.innerHTML = personas.map(persona => {
+                const isSelected = persona.id === currentId;
+                const isPreset = persona.is_preset !== false; // 预设人设
+                return `
+                <div class="persona-card flex items-center gap-3 p-3 rounded-lg border-2 cursor-pointer transition-all
+                    ${isSelected ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-blue-300 hover:bg-gray-50'}"
+                    onclick="selectPersona('${persona.id}')">
+                    <span class="text-2xl flex-shrink-0">${persona.icon || '👤'}</span>
+                    <div class="flex-1 min-w-0">
+                        <div class="text-sm font-semibold text-gray-900">${persona.name}</div>
+                        <div class="text-xs text-gray-400">${isPreset ? '预设' : '自定义'}</div>
+                        <div class="text-xs text-gray-500 truncate">${(persona.description || '').slice(0, 25)}${(persona.description || '').length > 25 ? '...' : ''}</div>
+                    </div>
+                    <button onclick="event.stopPropagation(); viewPersonaDetail('${persona.id}')" 
+                        class="text-gray-400 hover:text-blue-500 transition flex-shrink-0 p-2" title="查看详情">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                    </button>
+                    ${isSelected ? '<span class="text-blue-500 font-bold flex-shrink-0 text-base">✓</span>' : ''}
+                    ${!isPreset ? `
+                    <button onclick="editPersona(event, '${persona.id}')" class="text-gray-300 hover:text-blue-500 transition flex-shrink-0 mr-1" title="编辑人设">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                        </svg>
+                    </button>
+                    <button onclick="deletePersona(event, '${persona.id}')" class="text-gray-300 hover:text-red-500 transition flex-shrink-0" title="删除人设">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                        </svg>
+                    </button>` : ''}
+                </div>`;
+            }).join('');
+        }
+
+        async function selectPersona(personaId) {
+            try {
+                const response = await fetch('/api/personas/select', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ persona_id: personaId })
+                });
+                if (!response.ok) throw new Error('切换失败');
+                const result = await response.json();
+                
+                // 先更新全局变量
+                selectedPersonaId = personaId;
+                
+                // 重新加载人设列表（会从后端获取最新状态，但不会覆盖selectedPersonaId）
+                const personasRes = await fetch('/api/personas');
+                if (!personasRes.ok) throw new Error('获取人设列表失败');
+                const data = await personasRes.json();
+                const personas = data.personas;
+                const currentPersona = personas.find(p => p.id === personaId);
+                
+                // 渲染列表和更新显示
+                renderPersonaList(personas, personaId);
+                if (currentPersona) {
+                    updateCurrentPersonaDisplay(currentPersona);
+                }
+                
+                showToast(`✅ 已切换到：${result.name || personaId}`);
+            } catch (error) {
+                console.error('切换人设失败:', error);
+                showToast('❌ 切换人设失败，请重试');
+            }
+        }
+
+        async function deletePersona(event, personaId) {
+            event.stopPropagation();
+            if (!confirm('确定要删除这个自定义人设吗？')) return;
+            try {
+                const response = await fetch(`/api/personas/${personaId}`, { method: 'DELETE' });
+                if (!response.ok) throw new Error('删除失败');
+                showToast('✅ 人设已删除');
+                // 如果删除的是当前选中的，重置为默认
+                if (selectedPersonaId === personaId) selectedPersonaId = null;
+                loadPersonas();
+            } catch (error) {
+                console.error('删除人设失败:', error);
+                showToast('❌ 删除失败，请重试');
+            }
+        }
+
+        // 查看人设详情
+        async function viewPersonaDetail(personaId) {
+            try {
+                const response = await fetch(`/api/personas/${personaId}`);
+                if (!response.ok) throw new Error('获取失败');
+                const persona = await response.json();
+                
+                // 显示详情弹窗
+                const detailHtml = `
+                    <div class="fixed inset-0 bg-black bg-opacity-50 z-[70] flex items-center justify-center p-4" onclick="this.remove()">
+                        <div class="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto" onclick="event.stopPropagation()">
+                            <div class="p-5 border-b border-gray-200 flex justify-between items-center">
+                                <div class="flex items-center gap-3">
+                                    <span class="text-3xl">${persona.icon || '👤'}</span>
+                                    <div>
+                                        <h3 class="text-lg font-bold text-gray-900">${persona.name}</h3>
+                                        <p class="text-xs text-gray-500">${persona.description || '暂无描述'}</p>
+                                    </div>
+                                </div>
+                                <button onclick="this.closest('.fixed').remove()" class="text-gray-400 hover:text-gray-600">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                                    </svg>
+                                </button>
+                            </div>
+                            <div class="p-5 space-y-4">
+                                <div>
+                                    <h4 class="text-sm font-semibold text-gray-700 mb-2">📝 人设定位</h4>
+                                    <div class="bg-gray-50 rounded-lg p-3 text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">${persona.profile || '暂无内容'}</div>
+                                </div>
+                                <div>
+                                    <h4 class="text-sm font-semibold text-gray-700 mb-2">✍️ 写作风格</h4>
+                                    <div class="bg-gray-50 rounded-lg p-3 text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">${persona.style_guide || '暂无内容'}</div>
+                                </div>
+                                <div>
+                                    <h4 class="text-sm font-semibold text-gray-700 mb-2">📋 写作规则</h4>
+                                    <div class="bg-gray-50 rounded-lg p-3 text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">${persona.writing_rules || '暂无内容'}</div>
+                                </div>
+                                <div>
+                                    <h4 class="text-sm font-semibold text-gray-700 mb-2">✨ 润色要求</h4>
+                                    <div class="bg-gray-50 rounded-lg p-3 text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">${persona.polish_guide || '暂无内容'}</div>
+                                </div>
+                            </div>
+                            <div class="p-5 border-t border-gray-200 flex gap-3 justify-end">
+                                ${persona.is_preset === false ? `<button onclick="this.closest('.fixed').remove(); editPersona(null, '${personaId}')" class="px-4 py-2 border border-blue-500 text-blue-600 rounded-lg hover:bg-blue-50 transition">编辑</button>` : ''}
+                                <button onclick="this.closest('.fixed').remove()" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition">关闭</button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                document.body.insertAdjacentHTML('beforeend', detailHtml);
+            } catch (error) {
+                console.error('查看人设失败:', error);
+                showToast('❌ 查看失败，请重试');
+            }
+        }
+
+        // 编辑人设
+        async function editPersona(event, personaId) {
+            if (event) event.stopPropagation();
+            try {
+                const response = await fetch(`/api/personas/${personaId}`);
+                if (!response.ok) throw new Error('获取失败');
+                const persona = await response.json();
+                
+                // 填充表单
+                document.getElementById('customPersonaName').value = persona.name;
+                document.getElementById('customPersonaIcon').value = persona.icon || '';
+                document.getElementById('customPersonaDesc').value = persona.description || '';
+                document.getElementById('customPersonaPrompt').value = persona.profile || '';
+                
+                // 修改保存按钮为更新模式
+                const modal = document.getElementById('customPersonaModal');
+                const saveBtn = document.getElementById('savePersonaBtn');
+                modal.classList.remove('hidden');
+                modal.setAttribute('data-edit-id', personaId);
+                saveBtn.textContent = '更新人设';
+                saveBtn.onclick = () => updateCustomPersona(personaId);
+                
+                showToast('📝 正在编辑人设');
+            } catch (error) {
+                console.error('加载人设失败:', error);
+                showToast('❌ 加载失败，请重试');
+            }
+        }
+
+        // 更新人设
+        async function updateCustomPersona(personaId) {
+            const name = document.getElementById('customPersonaName').value.trim();
+            const icon = document.getElementById('customPersonaIcon').value.trim() || '🎭';
+            const description = document.getElementById('customPersonaDesc').value.trim();
+            const prompt = document.getElementById('customPersonaPrompt').value.trim();
+
+            if (!name) { showToast('❌ 请输入人设名称'); return; }
+            if (!prompt) { showToast('❌ 请填写人设提示词'); return; }
+
+            const saveBtn = document.getElementById('savePersonaBtn');
+            saveBtn.disabled = true;
+            saveBtn.textContent = '更新中...';
+
+            try {
+                const personaData = {
+                    name: name,
+                    description: description || '自定义人设',
+                    icon: icon,
+                    profile: prompt,
+                    style_guide: prompt,
+                    writing_rules: prompt,
+                    polish_guide: prompt
+                };
+                
+                const response = await fetch(`/api/personas/${personaId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(personaData)
+                });
+                if (!response.ok) {
+                    const err = await response.json();
+                    throw new Error(err.detail || '更新失败');
+                }
+                showToast('✅ 人设更新成功！');
+                closeCustomPersonaForm();
+                loadPersonas();
+            } catch (error) {
+                console.error('更新人设失败:', error);
+                showToast('❌ ' + (error.message || '更新失败，请重试'));
+            } finally {
+                saveBtn.disabled = false;
+                saveBtn.textContent = '更新人设';
+            }
+        }
+
+        function showCustomPersonaForm() {
+            document.getElementById('customPersonaModal').classList.remove('hidden');
+        }
+
+        function closeCustomPersonaForm() {
+            const modal = document.getElementById('customPersonaModal');
+            modal.classList.add('hidden');
+            modal.removeAttribute('data-edit-id');
+            document.getElementById('customPersonaName').value = '';
+            document.getElementById('customPersonaIcon').value = '';
+            document.getElementById('customPersonaDesc').value = '';
+            document.getElementById('customPersonaPrompt').value = '';
+            // 恢复保存按钮
+            const saveBtn = document.getElementById('savePersonaBtn');
+            saveBtn.textContent = '保存人设';
+            saveBtn.onclick = saveCustomPersona;
+        }
+
+        async function saveCustomPersona() {
+            const name = document.getElementById('customPersonaName').value.trim();
+            const icon = document.getElementById('customPersonaIcon').value.trim() || '🎭';
+            const description = document.getElementById('customPersonaDesc').value.trim();
+            const prompt = document.getElementById('customPersonaPrompt').value.trim();
+
+            if (!name) { showToast('❌ 请输入人设名称'); document.getElementById('customPersonaName').focus(); return; }
+            if (!prompt) { showToast('❌ 请填写人设提示词'); document.getElementById('customPersonaPrompt').focus(); return; }
+
+            const saveBtn = document.getElementById('savePersonaBtn');
+            saveBtn.disabled = true;
+            saveBtn.textContent = '保存中...';
+
+            try {
+                // 构建符合后端 PersonaData 模型的数据
+                const personaData = {
+                    name: name,
+                    description: description || '自定义人设',
+                    icon: icon,
+                    profile: prompt,  // 将提示词作为 profile
+                    style_guide: prompt,  // 同时用作 style_guide
+                    writing_rules: prompt,  // 同时用作 writing_rules
+                    polish_guide: prompt  // 同时用作 polish_guide
+                };
+                
+                const response = await fetch('/api/personas', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(personaData)
+                });
+                if (!response.ok) {
+                    const err = await response.json();
+                    throw new Error(err.detail || '创建失败');
+                }
+                showToast('✅ 自定义人设创建成功！');
+                closeCustomPersonaForm();
+                loadPersonas();
+            } catch (error) {
+                console.error('创建人设失败:', error);
+                showToast('❌ ' + (error.message || '创建失败，请重试'));
+            } finally {
+                saveBtn.disabled = false;
+                saveBtn.textContent = '保存人设';
+            }
+        }
+
+        function refreshHotTopics() {
+            const btn = document.getElementById('refreshHotBtn');
+            const icon = btn.querySelector('svg');
+            icon.style.animation = 'spin 0.5s linear';
+            setTimeout(() => { icon.style.animation = ''; }, 500);
+            showToast('🔄 正在刷新热点...');
+            loadHotTopics(true);
+        }
+
+        // ===== 主题搜索 =====
+        async function searchTopics() {
+            const input = document.getElementById('topicSearchInput');
+            const keyword = input.value.trim();
+            if (!keyword) { showToast('❌ 请输入搜索关键词'); input.focus(); return; }
+
+            // 更新按钮状态
+            const searchBtn = document.getElementById('searchTopicBtn');
+            const clearBtn = document.getElementById('clearSearchBtn');
+            searchBtn.disabled = true;
+            searchBtn.innerHTML = '<svg class="w-4 h-4 spinning" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg><span>搜索中</span>';
+            clearBtn.classList.remove('hidden');
+
+            // 显示骨架屏
+            document.getElementById('hotTopics').innerHTML = `<div class="skeleton-cards flex flex-wrap gap-3">
+                <div class="skeleton w-40 h-44 rounded-xl"></div>
+                <div class="skeleton w-40 h-44 rounded-xl"></div>
+                <div class="skeleton w-40 h-44 rounded-xl"></div>
+                <div class="skeleton w-40 h-44 rounded-xl"></div>
+            </div>`;
+
+            try {
+                const response = await fetch(`/api/search?keyword=${encodeURIComponent(keyword)}&limit=10`, {
+                    cache: 'no-cache'
+                });
+                if (!response.ok) throw new Error('搜索请求失败');
+                const topics = await response.json();
+
+                // 显示搜索状态
+                const statusEl = document.getElementById('searchStatus');
+                const statusText = document.getElementById('searchStatusText');
+                statusEl.classList.remove('hidden');
+                statusText.textContent = topics.length > 0
+                    ? `搜索「${keyword}」找到 ${topics.length} 条相关热点`
+                    : `搜索「${keyword}」暂无相关热点`;
+
+                // 渲染结果（复用现有渲染函数）
+                if (topics.length > 0) {
+                    renderHotTopics(topics, false);
+                } else {
+                    document.getElementById('hotTopics').innerHTML = `
+                        <div class="empty-state w-full">
+                            <div class="empty-state-icon">🔍</div>
+                            <p class="text-gray-600 mb-4">未找到与「${keyword}」相关的热点</p>
+                            <button onclick="clearSearch()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">返回热点列表</button>
+                        </div>`;
+                }
+            } catch (error) {
+                console.error('搜索失败:', error);
+                showToast('❌ 搜索失败，请重试');
+                document.getElementById('hotTopics').innerHTML = `
+                    <div class="empty-state w-full">
+                        <div class="empty-state-icon">⚠️</div>
+                        <p class="text-gray-600 mb-4">搜索失败，请重试</p>
+                        <button onclick="clearSearch()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">返回热点列表</button>
+                    </div>`;
+            } finally {
+                searchBtn.disabled = false;
+                searchBtn.innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0"></path></svg><span>搜索</span>';
+            }
+        }
+
+        function clearSearch() {
+            document.getElementById('topicSearchInput').value = '';
+            document.getElementById('clearSearchBtn').classList.add('hidden');
+            document.getElementById('searchStatus').classList.add('hidden');
+            loadHotTopics(false);
+        }
+
+        window.onbeforeunload = function() { if (eventSource) eventSource.close(); };
+    </script>
+
+    <!-- 自定义人设弹窗 -->
+    <div id="customPersonaModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-[60] flex items-center justify-center p-4" onclick="closeCustomPersonaForm()">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto" onclick="event.stopPropagation()">
+            <div class="p-5 border-b border-gray-200 flex justify-between items-center">
+                <h3 class="text-lg font-bold text-gray-900">🎭 创建自定义人设</h3>
+                <button onclick="closeCustomPersonaForm()" class="text-gray-400 hover:text-gray-600 transition">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+            <div class="p-5 space-y-4">
+                <!-- 名称和图标 -->
+                <div class="flex gap-3">
+                    <div class="flex-1">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">人设名称 <span class="text-red-500">*</span></label>
+                        <input type="text" id="customPersonaName" maxlength="20"
+                            class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                            placeholder="如：理性分析师">
+                    </div>
+                    <div class="w-24">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">图标（Emoji）</label>
+                        <input type="text" id="customPersonaIcon" maxlength="2"
+                            class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-center focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                            placeholder="🎭">
+                    </div>
+                </div>
+                <!-- 简介 -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">人设简介</label>
+                    <input type="text" id="customPersonaDesc" maxlength="50"
+                        class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        placeholder="一句话描述人设特点，如：冷静理性，数据说话">
+                </div>
+                <!-- 人设提示词 -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">
+                        人设提示词 <span class="text-red-500">*</span>
+                        <span class="text-xs text-gray-400 font-normal ml-1">（告诉AI以什么角色和风格写作）</span>
+                    </label>
+                    <textarea id="customPersonaPrompt" rows="6"
+                        class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
+                        placeholder="例如：你是一位严谨的数据分析师，写作风格冷静克制，善于用数字和事实说话。文章结构清晰，多用对比数据，避免情绪化表达。每段不超过3句话，保持简洁直接。"></textarea>
+                    <div class="mt-1 text-xs text-gray-500">💡 提示：越详细越好，可以包含写作风格、语气、结构偏好等</div>
+                </div>
+                <!-- 示例人设参考 -->
+                <div class="bg-gray-50 rounded-lg p-3">
+                    <div class="text-xs font-medium text-gray-600 mb-2">📖 快速参考模板（点击填入）：</div>
+                    <div class="flex flex-wrap gap-2">
+                        <button onclick="fillPersonaTemplate('comedian')" class="text-xs px-2 py-1 bg-white border border-gray-200 rounded hover:bg-yellow-50 hover:border-yellow-300 transition">😄 搞笑博主</button>
+                        <button onclick="fillPersonaTemplate('academic')" class="text-xs px-2 py-1 bg-white border border-gray-200 rounded hover:bg-blue-50 hover:border-blue-300 transition">🎓 学术专家</button>
+                        <button onclick="fillPersonaTemplate('storyteller')" class="text-xs px-2 py-1 bg-white border border-gray-200 rounded hover:bg-purple-50 hover:border-purple-300 transition">📖 故事达人</button>
+                        <button onclick="fillPersonaTemplate('critic')" class="text-xs px-2 py-1 bg-white border border-gray-200 rounded hover:bg-red-50 hover:border-red-300 transition">🔥 犀利评论家</button>
+                    </div>
+                </div>
+            </div>
+            <div class="p-5 border-t border-gray-200 flex gap-3 justify-end">
+                <button onclick="closeCustomPersonaForm()" class="px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50 transition">取消</button>
+                <button id="savePersonaBtn" onclick="saveCustomPersona()" class="px-5 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700 transition disabled:bg-gray-400 disabled:cursor-not-allowed">保存人设</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 快速填入人设模板
+        const personaTemplates = {
+            comedian: {
+                name: '搞笑博主',
+                icon: '😄',
+                desc: '幽默风趣，用段子说热点',
+                prompt: '你是一位擅长用幽默感解读热点的搞笑博主，写作风格轻松活泼，善用类比和段子，能把严肃的新闻讲得妙趣横生。文章多用口语化表达，偶尔自我调侃，让读者在会心一笑中理解事件本质。避免说教，保持轻松愉快的氛围。'
+            },
+            academic: {
+                name: '学术专家',
+                icon: '🎓',
+                desc: '严谨专业，引用数据',
+                prompt: '你是一位严谨的学术专家，写作风格专业严肃，善于引用研究数据和权威来源。文章结构遵循"背景-问题-分析-结论"的逻辑框架，多用客观数据支撑观点，语言精准简洁，避免模糊和主观判断。适当使用学术术语，但保持可读性。'
+            },
+            storyteller: {
+                name: '故事达人',
+                icon: '📖',
+                desc: '善于叙事，代入感强',
+                prompt: '你是一位擅长讲故事的内容创作者，写作风格生动叙事，善于通过具体场景和人物故事来呈现新闻事件。文章开篇往往以一个具体场景切入，带读者进入故事现场，再逐步展开背景和分析。语言形象具体，多用场景描写，让读者有身临其境的感觉。'
+            },
+            critic: {
+                name: '犀利评论家',
+                icon: '🔥',
+                desc: '观点鲜明，一针见血',
+                prompt: '你是一位观点鲜明的评论家，写作风格犀利直接，敢于发表独到见解。文章直击要害，不绕弯子，善于从反常识角度切入，挑战读者固有认知。语言简洁有力，多用反问和对比，给读者强烈的认知冲击。每篇文章都有明确的核心论点。'
+            }
+        };
+
+        function fillPersonaTemplate(type) {
+            const tpl = personaTemplates[type];
+            if (!tpl) return;
+            document.getElementById('customPersonaName').value = tpl.name;
+            document.getElementById('customPersonaIcon').value = tpl.icon;
+            document.getElementById('customPersonaDesc').value = tpl.desc;
+            document.getElementById('customPersonaPrompt').value = tpl.prompt;
+        }
+    </script>
+</body>
+</html>

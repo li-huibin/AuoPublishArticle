@@ -1,0 +1,22 @@
+{
+  "version": "1.0",
+  "last_updated": "2026-03-05T09:31:49.103580",
+  "weights": {
+    "forbidden_symbols": 1,
+    "forbidden_words": 2,
+    "fake_names": 1,
+    "repeated_questions": 1,
+    "forbidden_patterns": 1,
+    "teaching_structure": 1
+  },
+  "thresholds": {
+    "ai_qualified": 70,
+    "reality_qualified": 70,
+    "overall_qualified": 70
+  },
+  "auto_adjust": {
+    "enabled": true,
+    "adjust_interval": 5,
+    "learning_rate": 0.1
+  }
+}
