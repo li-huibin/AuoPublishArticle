@@ -322,6 +322,7 @@ async def publish_article(request: PublishRequest):
     try:
         print(f"[API] 收到发布请求，标题: {request.title}")
         print(f"[API] 内容长度: {len(request.content)} 字符")
+        print(f"[API] 配图数量: {len(request.images)}")
         
         wechat = WeChatClient()
         print("[API] WeChatClient 初始化成功")

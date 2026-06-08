@@ -66,4 +66,4 @@ if __name__ == "__main__":
     import uvicorn
     print("🚀 启动AI文章生成工作台...")
     print("📝 访问地址: http://localhost:8000")
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="127.0.0.1", port=8000)

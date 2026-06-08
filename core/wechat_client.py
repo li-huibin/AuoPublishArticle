@@ -1,4 +1,7 @@
 # -*- coding: utf-8 -*-
+import base64
+import uuid
+
 import requests
 import json
 import time
@@ -322,6 +325,29 @@ class WeChatClient:
             print(f"[!] 上传图片失败: {e}")
             return None
 
+    def upload_image_from_base64(self, base64_image) -> str | None:
+        '''
+        从base64编码的图片字符串上传图片到微信永久素材库
+        :param base64_image: base64 编码的图片字符串
+        :return: media_id
+        '''
+        print(f"[*] 正在上传配图到微信素材库:")
+        # 将图片保存为临时本地文件
+        temp_image_path = f"/tmp/{uuid.uuid4().hex}.png"
+        try:
+            # 去掉了 data:image/png;base64, 前缀
+            base64_image = base64_image.split("base64,")[1]
+            with open(temp_image_path, "wb") as f:
+                f.write(base64.b64decode(base64_image))
+            media_id = self.upload_image(temp_image_path)
+            return media_id
+        except Exception as e:
+            print(f"[!] 上传配图失败: {e}")
+            return None
+        finally:
+            # 删除临时文件
+            os.remove(temp_image_path)
+
     def format_image_html(self, media_id, caption=""):
         """
         生成微信公众号图片 HTML
@@ -344,7 +370,7 @@ class WeChatClient:
         一键发布文章到微信公众号（上传草稿 + 自动发布）
         :param title: 文章标题
         :param content: 文章内容（支持 Markdown 或 HTML）
-        :param images: 图片列表（可选，暂未实现）
+        :param images: 图片列表（可选，如果没有设置封面图，默认选择第一张配图设置为封面图）
         :return: 发布结果
         """
         try:
@@ -382,7 +408,15 @@ class WeChatClient:
             
             # 4. 获取封面图 media_id（从环境变量读取）
             cover_id = os.environ.get("WECHAT_COVER_ID")
-            
+
+            # 如果cover_id为空，请求https://api.weixin.qq.com/cgi-bin/material/add_material,将data/images/default01.jpeg上传到素材库
+            if not cover_id:
+                # 默认选择第一张配图作为封面
+                if images:
+                    cover_id = self.upload_image_from_base64(images[0])
+                else:
+                    cover_id = self.upload_image("data/images/default01.jpeg")
+
             # 第一步：上传草稿
             media_id = self.upload_draft(
                 title=title,
