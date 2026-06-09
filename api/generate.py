@@ -15,6 +15,8 @@ import threading
 import sys
 import os
 
+from core.image_manager import ImageManager
+
 # 添加项目根目录到路径
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -227,7 +229,7 @@ async def generate_article(
                 try:
                     # 懒加载 LLM 客户端
                     llm_client = get_llm_client()
-                    generator = ArticleGenerator(llm_client=llm_client)
+                    generator = ArticleGenerator(llm_client=llm_client, image_manager=ImageManager())
                     result = generator.generate_article(
                         topic=topic,
                         collect_resources=True,
